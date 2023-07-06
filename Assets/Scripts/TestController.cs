@@ -3,6 +3,8 @@ using UnityEngine;
 using System.IO;
 using System;
 
+//[How it works]: Необходиом сделать два запуска сцены, один с _isFirstLaunch = true, второй = false
+
 public class TestController : MonoBehaviour
 {
     [SerializeField] private bool _isFirstLaunch = true;
@@ -31,8 +33,6 @@ public class TestController : MonoBehaviour
             SaveDataBeforeTest(fData);
         }
 
-
-        //Сборка мостов для трансляции данных
         InitializeBridgeHandler();
     }
 
@@ -63,19 +63,15 @@ public class TestController : MonoBehaviour
         if (_isFirstLaunch)
             return;
 
-        IData firstFormatData = LoadDataAfterGlobalUpdate(); 
+        IData firstFormatData = LoadDataAfterGlobalUpdate();
         Debug.Log($"TestController: Current format is {firstFormatData.GetType()} ");
 
-        //Update project. Template
-        _projectState.UpdateDataFormat(DataType.SecondType); 
+        FirstProjectUpdate();
 
         IData secondFormatData_1 = TransferDataToAnotherFormat(firstFormatData);
         SaveDataBeforeTest(secondFormatData_1);
 
-        //Update with DLC. Template
-        _projectState.UpdateDataFormat(DataType.FirstDLC);
-        _projectState.UpdateStratagiesContainer(new SecondLoadStratagiesContainer());
-
+        FirstDLC();
 
         IData secondFormatData_2 = LoadDataAfterGlobalUpdate();
         Debug.Log($"TestController: Current format is {secondFormatData_2.GetType()} ");
@@ -83,20 +79,15 @@ public class TestController : MonoBehaviour
         IData firstDLCDataFormat_1 = TransferDataToAnotherFormat(secondFormatData_2);
         SaveDataBeforeTest(firstDLCDataFormat_1);
 
-        //Update with DLC. Template
-        _projectState.UpdateDataFormat(DataType.SecondDLC);
-        _projectState.UpdateStratagiesContainer(new ThirdLoadStratagiesContainer());
-
+        SecondDLC();
 
         IData firstDLCDataFormat_2 = LoadDataAfterGlobalUpdate();
         Debug.Log($"TestController: Current format is {firstDLCDataFormat_2.GetType()} ");
 
         IData secondDLCDataFormat_1 = TransferDataToAnotherFormat(firstDLCDataFormat_2);
         SaveDataBeforeTest(secondDLCDataFormat_1);
-
-        //Update with DLC. Template
-        _projectState.UpdateStratagiesContainer(new FourthLoadStratagiesContainer());
-
+        
+        ThirdDLC();
 
         IData secondDLCDataFormat_2 = LoadDataAfterGlobalUpdate();
         Debug.Log($"TestController: Current format is {secondDLCDataFormat_2.GetType()} ");
@@ -122,6 +113,28 @@ public class TestController : MonoBehaviour
         var bridge = _projectState.BridgeHandler.GetBridge(oldData.Type, _projectState.CurrentDataFormat);
         
         return bridge.Convert(oldData);
+    }
+
+    private void FirstProjectUpdate()
+    {
+        _projectState.UpdateDataFormat(DataType.SecondType);
+    }
+
+    private void FirstDLC()
+    {
+        _projectState.UpdateDataFormat(DataType.FirstDLC);
+        _projectState.UpdateStratagiesContainer(new SecondLoadStratagiesContainer());
+    }
+
+    private void SecondDLC()
+    {
+        _projectState.UpdateDataFormat(DataType.SecondDLC);
+        _projectState.UpdateStratagiesContainer(new ThirdLoadStratagiesContainer());
+    }
+
+    private void ThirdDLC()
+    {
+        _projectState.UpdateStratagiesContainer(new FourthLoadStratagiesContainer());
     }
 }
 
