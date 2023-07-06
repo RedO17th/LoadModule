@@ -1,68 +1,43 @@
-using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using System.IO;
-
-public enum DataType { None = -1, FirstType, SecondType }
-
-public interface IData
-{
-    public DataType Type { get; }
-}
-public class BaseData : IData
-{
-    public DataType Type { get; protected set; } = DataType.None;
-    public string Data { get; protected set; }
-
-    public BaseData(DataType type, string data)
-    {
-        Type = type;
-
-        Data = data;
-    }
-}
-
-public class FirstTypeData : BaseData
-{
-    public int Number { get; private set; }
-    public FirstTypeData(DataType type, string data, int number) : base(type, data) 
-    {
-        Number = number;
-    }
-}
-public class SecondTypeData : BaseData
-{
-    public float Number { get; private set; } 
-    public SecondTypeData(DataType type, string data, float number) : base(type, data) 
-    {
-        Number = number;
-    }
-}
+using System;
 
 public class TestController : MonoBehaviour
 {
-    [SerializeField] private bool _isFirst = true;
+    [SerializeField] private bool _isFirstLaunch = true;
     [SerializeField] private string _fileName;
     [SerializeField] private string _keyName;
 
     private string _dataPath = string.Empty;
     private string _keyPath = string.Empty;
 
+    private ProjectState _projectState = null;
+
     private void Awake()
     {
+        _projectState = new ProjectState();
+        _projectState.UpdateDataFormat(DataType.FirstType);
+        _projectState.UpdateStratagiesContainer(new FirstLoadStratagiesContainer());
+        _projectState.UpdateBridgeHandler(new BridgeHandler());
+
         _dataPath = Path.Combine(Application.persistentDataPath, _fileName);
         _keyPath = Path.Combine(Application.persistentDataPath, _keyName);
 
-        SaveDataBeforeTest();
+        if (_isFirstLaunch)
+        {
+            IData fData = new FirstTypeData(DataType.FirstType, "FirstTypeData", 5);
+
+            SaveDataBeforeTest(fData);
+        }
+
+
+        //—борка мостов дл€ трансл€ции данных
+        InitializeBridgeHandler();
     }
 
-    private void SaveDataBeforeTest()
+    private void SaveDataBeforeTest(IData dataToSave)
     {
-        IData fData = new FirstTypeData(DataType.FirstType, "FirstTypeData", 5);
-        IData sData = new SecondTypeData(DataType.SecondType, "SecondTypeData", 5f);
-
-        IData dataToSave = _isFirst ? fData : sData;
-
         ISaveSystem _saveSystem = new SaveSystem();
                     _saveSystem.SetPath(_dataPath);
                     _saveSystem.Save(dataToSave);
@@ -71,25 +46,82 @@ public class TestController : MonoBehaviour
             specifier.SaveKey(_keyPath, dataToSave.Type);
     }
 
+    private void InitializeBridgeHandler()
+    {
+        Dictionary<FormatChecker, IDataBridge> bridges = new Dictionary<FormatChecker, IDataBridge>()
+        {
+            { new FormatChecker(DataType.FirstType, DataType.SecondType), new FirstToSecondDataFormat() },
+            { new FormatChecker(DataType.SecondType, DataType.FirstDLC), new SecondToFirstDLCDataFormat() },
+            { new FormatChecker(DataType.FirstDLC, DataType.SecondDLC), new FirstDLCToSecondDLCDataFormat() }
+        };
+
+        _projectState.BridgeHandler.SetBridges(bridges);
+    }
+
     private void Start()
     {
-        var stratagies = new Dictionary<DataType, ILoadStrategy>()
-        {
-            { DataType.FirstType, new FirstLoadStrategy(_dataPath) },
-            { DataType.SecondType, new SecondLoadStrategy(_dataPath) }
-        };
+        if (_isFirstLaunch)
+            return;
+
+        IData firstFormatData = LoadDataAfterGlobalUpdate(); 
+        Debug.Log($"TestController: Current format is {firstFormatData.GetType()} ");
+
+        //Update project. Template
+        _projectState.UpdateDataFormat(DataType.SecondType); 
+
+        IData secondFormatData_1 = TransferDataToAnotherFormat(firstFormatData);
+        SaveDataBeforeTest(secondFormatData_1);
+
+        //Update with DLC. Template
+        _projectState.UpdateDataFormat(DataType.FirstDLC);
+        _projectState.UpdateStratagiesContainer(new SecondLoadStratagiesContainer());
+
+
+        IData secondFormatData_2 = LoadDataAfterGlobalUpdate();
+        Debug.Log($"TestController: Current format is {secondFormatData_2.GetType()} ");
+
+        IData firstDLCDataFormat_1 = TransferDataToAnotherFormat(secondFormatData_2);
+        SaveDataBeforeTest(firstDLCDataFormat_1);
+
+        //Update with DLC. Template
+        _projectState.UpdateDataFormat(DataType.SecondDLC);
+        _projectState.UpdateStratagiesContainer(new ThirdLoadStratagiesContainer());
+
+
+        IData firstDLCDataFormat_2 = LoadDataAfterGlobalUpdate();
+        Debug.Log($"TestController: Current format is {firstDLCDataFormat_2.GetType()} ");
+
+        IData secondDLCDataFormat_1 = TransferDataToAnotherFormat(firstDLCDataFormat_2);
+        SaveDataBeforeTest(secondDLCDataFormat_1);
+
+        //Update with DLC. Template
+        _projectState.UpdateStratagiesContainer(new FourthLoadStratagiesContainer());
+
+
+        IData secondDLCDataFormat_2 = LoadDataAfterGlobalUpdate();
+        Debug.Log($"TestController: Current format is {secondDLCDataFormat_2.GetType()} ");
+    }
+
+    private IData LoadDataAfterGlobalUpdate()
+    {
+        var stratagies = _projectState.StratagiesContainer.GetStratagies();
 
         IStrategiesFactory strategiesFactory = new StrategiesFactory();
                            strategiesFactory.SetStrategies(stratagies);
 
-        var specifier = new DataTypeSpecifier();
+        DataType dataType = new DataTypeSpecifier().GetDataType(_keyPath);
 
-        DataType dataType = specifier.GetDataType(_keyPath);
+        ILoadStrategy strategy = strategiesFactory.GetStrategyBy(dataType);
+                      strategy.SetPath(_dataPath);
 
-        ILoadStrategy strategy = strategiesFactory.Create(dataType);
-        IData data = strategy.Load();
+        return strategy.Load();
+    }
 
-        Debug.Log($"TestController: Type is {data.GetType()}");
+    private IData TransferDataToAnotherFormat(IData oldData)
+    {
+        var bridge = _projectState.BridgeHandler.GetBridge(oldData.Type, _projectState.CurrentDataFormat);
+        
+        return bridge.Convert(oldData);
     }
 }
 

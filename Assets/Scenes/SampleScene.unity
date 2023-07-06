@@ -314,6 +314,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2363108fff54d1c45b3c000753fd9301, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _isFirst: 1
+  _isFirstLaunch: 1
   _fileName: Data
   _keyName: Key
