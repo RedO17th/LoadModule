@@ -1,9 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
 using System.IO;
-using System;
-
-//[How it works]: Необходиом сделать два запуска сцены, один с _isFirstLaunch = true, второй = false
 
 public class TestController : MonoBehaviour
 {
